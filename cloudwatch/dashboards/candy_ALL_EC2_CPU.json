@@ -1,0 +1,18 @@
+{
+    "metrics": [
+        [ "AWS/EC2", "CPUUtilization", "InstanceId", "i-07bf390ef4fb9eec7", { "label": "candy-crawler", "id": "m1" } ],
+        [ "...", "i-05a24545956adef8d", { "label": "candy-crawler-orderbook", "id": "m2" } ],
+        [ "...", "i-005030e10b8e8402f", { "label": "candy-crawler-price", "id": "m3" } ],
+        [ "...", "i-012692fb8196a8497", { "label": "db-redis", "id": "m4" } ],
+        [ "...", "i-0014c93fa1ac73084", { "label": "candy-deploy", "id": "m5" } ],
+        [ "...", "i-0d3c28f71e58475c4", { "label": "halls", "id": "m6" } ],
+        [ "...", "i-0dee2a708ce5388e4", { "label": "halls-cow", "id": "m7" } ],
+        [ "...", "i-009be07f4e0828a51", { "label": "ricola", "id": "m8" } ],
+        [ "...", "i-0745a6950bdfdd05c", { "label": "wireguard", "id": "m9" } ]
+    ],
+    "view": "timeSeries",
+    "stacked": false,
+    "region": "ap-northeast-2",
+    "title": "ALL_EC2_CPU",
+    "period": 300
+}

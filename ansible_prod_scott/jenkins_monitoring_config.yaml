@@ -1,0 +1,7 @@
+- name: collectd, cloudwatch, and post-setup AIO for jenkins server
+  hosts: jenkins
+  vars:
+    my_hosts: jenkins
+  tasks:
+    - name: install cloudwatch-agent and configure
+      import_tasks: tasks/install_amzn_cloudwatch_agent_config_ubuntu_generic.yaml

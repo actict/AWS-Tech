@@ -1,0 +1,7 @@
+- name: config cloudwatch for front-1 server
+  hosts: front-1
+  vars:
+    my_hosts: front-1
+  tasks:
+    - name: install cloudwatch-agent and configure
+      import_tasks: tasks/install_amzn_cloudwatch_agent_config_ubuntu_generic.yaml

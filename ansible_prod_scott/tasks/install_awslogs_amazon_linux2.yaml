@@ -1,0 +1,35 @@
+- name: Install awslogs package from amazon linux default repos
+  yum:
+    name: awslogs
+    state: present
+  become: True
+
+- name: Copy awscli.conf for ap-northeast-2 (Seoul) to remote
+  copy:
+    src: ~/Documents/whalex/AWS/cloudwatch/awscli.conf
+    dest: /etc/awslogs/awscli.conf
+  become: True
+
+- name: Copy clean awslogs.conf to remote
+  copy:
+    src: ~/Documents/whalex/AWS/cloudwatch/awslogs.conf
+    dest: /etc/awslogs/awslogs.conf
+  become: True
+
+- name: Copy awslogs custom log config to remote machine
+  copy:
+    src: ~/Documents/whalex/AWS/cloudwatch/awslogs.config.{{ my_hosts }}
+    dest: /etc/awslogs/config/{{ my_hosts }}.conf
+  become: True
+
+- name: enable awslogsd systemd service to start at boot
+  systemd:
+    name: awslogsd
+    enabled: yes
+  become: True
+
+- name: start awslogsd service to apply new config
+  service:
+    name: awslogsd
+    state: started
+  become: True

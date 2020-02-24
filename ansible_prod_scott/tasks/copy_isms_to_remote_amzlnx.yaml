@@ -1,0 +1,72 @@
+---
+
+- debug:
+    msg: "{{ hostvars[inventory_hostname].ansible_distribution }}"
+
+- name: Ensure that {{ diag_remote_tmp }} path exists
+  file:
+    path: "{{ diag_remote_tmp }}"
+    state: directory
+    recurse: yes
+  become: True
+
+  #- name: Install python-pip package from default repos
+  #yum:
+  #  name: python-pip
+  #  state: present
+  #become: True
+
+  #- name: pip install pexpec
+  #shell: >
+  #    pip install pexpect
+  #become: True
+
+- name: Copy Linux_isms.sh from {{ diag_local_path }} to {{ diag_remote_tmp }}
+  copy:
+    src: "{{ diag_local_path }}/Linux_isms.sh"
+    dest: "{{ diag_remote_tmp }}/Linux_isms.sh"
+  become: True
+
+- name: Copy input.txt from {{ diag_local_path }} to {{ diag_remote_tmp }}
+  copy:
+    src: "{{ diag_local_path }}/input.txt"
+    dest: "{{ diag_remote_tmp }}/input.txt"
+  become: True
+
+- name: make extracted shell scripts executable
+  file:
+    path: "{{ diag_remote_tmp }}/Linux_isms.sh"
+    mode: "a+x"
+  become: True
+
+- name: run Linux_isms.sh as root
+  shell: >
+      cd "{{ diag_remote_tmp }}"; ./Linux_isms.sh < input.txt
+  become: True
+  ignore_errors: True
+  register: result
+
+- debug:
+    var: result.stdout_lines
+
+- name: find files to copy
+  find:
+    paths: "{{ diag_remote_tmp }}"
+    recurse: no
+    patterns: "*.uraw"
+  register: files_to_copy
+
+- name: Copy Linux_isms.sh from {{ item.path }} to {{ item.path }}
+  fetch:
+    src: "{{ item.path }}"
+    dest: "{{ item.path }}"
+    flat: yes
+  with_items: "{{files_to_copy.files}}"
+  become: True
+
+- name: Recursively remove directory
+  file:
+    path: "{{ diag_remote_tmp }}"
+    state: absent
+  become: True
+  become_user: root

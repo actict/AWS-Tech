@@ -1,0 +1,16 @@
+# ansible-playbook isms_diagnosis.yaml -i hosts_isms --extra-vars \
+#  "myhost=<specific host or group>"
+
+- name: playbook for isms diagnosis on ubuntu/amzlinux
+  hosts: hvault
+  vars:
+    diag_remote_tmp: "/tmp/diagnosis"
+    diag_local_path: "~/Documents/SecOps-Documents/isms/diagnosis"
+  tasks:
+    - name: copy and execute Linux_isms.sh to ubuntu
+      import_tasks: tasks/copy_isms_to_remote_ubuntu.yaml
+      when: ansible_distribution == "Ubuntu"
+    - name: copy and execute Linux_isms.sh to amzlinux
+      import_tasks: tasks/copy_isms_to_remote_amzlnx.yaml
+      when: ansible_distribution == "Amazon"
+

@@ -1,0 +1,8 @@
+- name: playbook to update pkgs and reboot AWS PROD blockinpress-web server
+  hosts: blockinpress-web
+  tasks:
+    - name: update packages on ubuntu server which allows sudo
+      import_tasks: tasks/update_ubuntu_sudo.yaml
+
+    - name: reboot server which allows sudo
+      import_tasks: tasks/reboot_server_sudo.yaml

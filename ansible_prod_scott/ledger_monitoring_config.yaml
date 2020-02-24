@@ -1,0 +1,7 @@
+- name: config cloudwatch for ledger server
+  hosts: ledger
+  vars:
+    my_hosts: ledger
+  tasks:
+    - name: install cloudwatch-agent and configure
+      import_tasks: tasks/install_amzn_cloudwatch_agent_config_ubuntu_generic.yaml

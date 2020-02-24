@@ -1,0 +1,7 @@
+- name: playbook to stop service on AWS PROD terra-lcd server
+  hosts: terra-lcd
+  vars:
+    svc_name: terralcd.service
+  tasks:
+    - name: stop terralcd daemon
+      import_tasks: tasks/stop_service_su.yaml

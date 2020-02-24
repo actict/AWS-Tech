@@ -1,0 +1,47 @@
+- name: Update repos and install necessary dev packages
+  apt:
+    name: ['gcc', 'git', 'make']
+    state: present
+    update_cache: yes
+  become: True
+
+- name: Check if golang tar.gz has been downloaded
+  stat:
+    path: /root/{{ gopkg }}
+  become: True
+  register: stat_result
+
+- name: Download latest golang pkg from Google
+  get_url:
+    url: https://dl.google.com/go/{{ gopkg  }}
+    dest: "/root"
+    force: yes
+  become: True
+  when: stat_result.stat.exists == False
+
+- name: Extract golang packages from tar.gz archive
+  unarchive:
+    src: /root/{{ gopkg }}
+    dest: /usr/local
+    remote_src: yes
+  become: True
+
+- name: Create GOPATH
+  file:
+    path: ~/goproj
+    state: directory
+
+- name: Create src directory in GOPATH
+  file:
+    path: ~/goproj/src
+    state: directory
+
+
+- name: Insert Golang env vars into ~/.bashrc
+  lineinfile:
+    path: ~/.bashrc
+    line: "{{ item }}"
+  with_items:
+    - "export GOROOT=/usr/local/go"
+    - "export GOPATH=~/goproj"
+    - "export PATH=$PATH:/usr/local/go/bin:~/goproj/bin"

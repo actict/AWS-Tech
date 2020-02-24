@@ -1,0 +1,7 @@
+- name: collectd, cloudwatch, and post-setup AIO for pl-batch server
+  hosts: pl-batch
+  vars:
+    my_hosts: pl-batch
+  tasks:
+    - name: install cloudwatch-agent and configure
+      import_tasks: tasks/install_amzn_cloudwatch_agent_config_ubuntu_generic.yaml

@@ -1,0 +1,18 @@
+- name: upload gdac.com ssl certs to web servers and restart nginx
+  hosts: ssl-replacement
+  tasks:
+    - name: Copy new gdac.com wildcard cert file to remote server
+      copy:
+        src: "~/tmp/certmanager/home/ubuntu/archive/gdac.com/2019-02-18-01:00/cert.pem"
+        dest: "/etc/pki/nginx/STAR_gdac_com.crt"
+      become: True
+    - name: Copy new gdac.com wildcard key file to remote server
+      copy:
+        src: "~/tmp/certmanager/home/ubuntu/archive/gdac.com/2019-02-18-01:00/privkey.pem"
+        dest: "/etc/pki/nginx/STAR_gdac_com.key"
+      become: True
+    - name: restart nginx service
+      service:
+        name: nginx
+        state: restarted
+      become: True

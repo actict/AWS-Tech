@@ -1,0 +1,7 @@
+- name: playbook to stop service on AWS PROD irisnet-lcd server
+  hosts: irisnet-lcd
+  vars:
+    svc_name: irislcd14.service
+  tasks:
+    - name: stop irislcd14 daemon
+      import_tasks: tasks/stop_service.yaml

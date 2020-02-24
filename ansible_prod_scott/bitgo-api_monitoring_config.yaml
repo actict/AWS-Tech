@@ -1,0 +1,7 @@
+- name: config cloudwatch for bitgo-api server
+  hosts: bitgo-api
+  vars:
+    my_hosts: bitgo-api
+  tasks:
+    - name: install cloudwatch-agent and configure
+      import_tasks: tasks/install_amzn_cloudwatch_agent_config_ubuntu_generic.yaml

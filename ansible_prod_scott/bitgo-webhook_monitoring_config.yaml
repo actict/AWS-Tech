@@ -1,0 +1,7 @@
+- name: config cloudwatch for bitgo-webhook server
+  hosts: bitgo-webhook
+  vars:
+    my_hosts: bitgo-webhook
+  tasks:
+    - name: install cloudwatch-agent and configure
+      import_tasks: tasks/install_amzn_cloudwatch_agent_config_ubuntu_generic.yaml

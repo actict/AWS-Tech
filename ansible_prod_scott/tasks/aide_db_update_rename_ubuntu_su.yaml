@@ -1,0 +1,37 @@
+# ansible task file for updating AIDE db on Ubuntu 18.04+ This task
+# file only works on servers allowing sudo!
+- name: Check if AIDE is installed or not (ubuntu)
+  stat:
+    path: /usr/bin/aide
+  become: true
+  become_method: su
+  become_user: root
+  register: aide_ubuntu
+
+- name: Update AIDE DB
+  shell: >
+    /usr/bin/aide -c /etc/aide.conf --update
+  become: true
+  become_method: su
+  become_user: root
+  when: aide_ubuntu.stat.exists == true
+  ignore_errors: true
+
+- name: rename updated AIDE db
+  copy:
+    remote_src: true
+    src: /var/lib/aide/aide.db.new.gz
+    dest: /var/lib/aide/aide.db.gz
+  become: true
+  become_method: su
+  become_user: root
+  when: aide_ubuntu.stat.exists == true
+
+- name: delete aide.db.gz.new
+  file:
+    path: /var/lib/aide/aide.db.new.gz
+    state: absent
+  become: true
+  become_method: su
+  become_user: root
+  when: aide_ubuntu.stat.exists == true

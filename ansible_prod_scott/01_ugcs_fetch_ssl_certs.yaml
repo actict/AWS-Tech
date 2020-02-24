@@ -1,0 +1,19 @@
+- name: Copy SSL certs from certmanager to local dev notebook
+  hosts: certmanager
+  tasks:
+    - name: fetch new gdac.com wildcard cert file, save in ~/tmp
+      fetch:
+        src: "/home/ubuntu/archive/gdac.com/2019-02-18-01:00/cert.pem"
+        dest: "/home/junbuntu/tmp"
+    - name: fetch new gdac.com wildcard cert key file, save in ~/tmp
+      fetch:
+        src: "/home/ubuntu/archive/gdac.com/2019-02-18-01:00/privkey.pem"
+        dest: "/home/junbuntu/tmp"
+    - name: fetch new gdac.com wildcard cert chain file, save in ~/tmp
+      fetch:
+        src: "/home/ubuntu/archive/gdac.com/2019-02-18-01:00/chain.pem"
+        dest: "/home/junbuntu/tmp"
+    - name: fetch new gdac.com wildcard cert fullchain file, save in ~/tmp
+      fetch:
+        src: "/home/ubuntu/archive/gdac.com/2019-02-18-01:00/fullchain.pem"
+        dest: "/home/junbuntu/tmp"

@@ -1,0 +1,25 @@
+{
+  "agent": {
+    "metrics_collection_interval": 60,
+    "region": "ap-northeast-2",
+    "logfile": "",
+    "debug": false
+  },
+
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          {
+            "file_path": "/var/log/messages",
+            "log_group_name": "cosmos_var_log_messages",
+            "log_stream_name": "valid0_{ip_address}_var_log_messages.log",
+            "timezone": "UTC",
+            "encoding": "utf-8"
+          }
+        ]
+      }
+    },
+    "log_stream_name":"valid0_log_default"
+  }
+}

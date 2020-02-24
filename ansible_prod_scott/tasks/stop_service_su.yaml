@@ -1,0 +1,7 @@
+- name: stop service
+  service:
+    name: "{{ svc_name }}"
+    state: stopped
+  become: true
+  become_method: su
+  become_user: root

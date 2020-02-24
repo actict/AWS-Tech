@@ -1,0 +1,12 @@
+[notifier_app_logs]
+log_group_name = notifier_logs
+log_stream_name = notifier_{ip_address}_app.log
+file = /var/log/nodejs/notifier.log*
+[notifier_nginx_access]
+log_group_name = notifier_logs
+log_stream_name = notifier_{ip_address}_nginx_access.log
+file = /var/log/nginx/access.log
+[notifier_nginx_error]
+log_group_name = notifier_logs
+log_stream_name = notifier_{ip_address}_nginx_error.log
+file = /var/log/nginx/error.log

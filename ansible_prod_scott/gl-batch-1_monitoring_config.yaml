@@ -1,0 +1,7 @@
+- name: collectd, cloudwatch, and post-setup AIO for gl-batch-1 server
+  hosts: gl-batch-1
+  vars:
+    my_hosts: gl-batch-1
+  tasks:
+    - name: install cloudwatch-agent and configure
+      import_tasks: tasks/install_amzn_cloudwatch_agent_config_ubuntu_generic.yaml

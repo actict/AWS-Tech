@@ -1,0 +1,7 @@
+- name: collectd, cloudwatch, and post-setup AIO for kakaopay server
+  hosts: kakaopay
+  vars:
+    my_hosts: kakaopay
+  tasks:
+    - name: install cloudwatch-agent and configure
+      import_tasks: tasks/install_amzn_cloudwatch_agent_ubuntu_generic.yaml

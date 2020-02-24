@@ -1,0 +1,9 @@
+- name: From ansible master copy index-maintenance.html to maintenance server
+  hosts: maintenance
+  tasks:
+    - name: cp index-maintenance.html to remote
+      copy:
+        src: ~/Documents/SecOps-Documents/AWS/awscli/maintenance/index.html
+        dest: /var/www/html/index.html
+        mode: 0644
+      become: True

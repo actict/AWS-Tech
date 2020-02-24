@@ -1,0 +1,23 @@
+- name: stop amazon-cloudwatch-agent service for config customization
+  service:
+    name: amazon-cloudwatch-agent
+    state: stopped
+  become: True
+  become_method: su
+  become_user: root
+
+- name: Copy cloudwatch agent log config matching {{ my_hosts }} var
+  copy:
+    src: ~/Documents/SecOps-Documents/AWS/cloudwatch/amazon-cloudwatch-agent.json.{{ my_hosts }}
+    dest: /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
+  become: True
+  become_method: su
+  become_user: root
+
+- name: start amazon-cloudwatch-agent service to apply new config
+  service:
+    name: amazon-cloudwatch-agent
+    state: started
+  become: True
+  become_method: su
+  become_user: root

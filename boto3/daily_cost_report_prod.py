@@ -1,0 +1,1036 @@
+#!/usr/bin/env python3
+# daily_cost_report_prod.py
+#
+# Last Updated: 2019.10.24
+# Updated by: scott.hwang@peertec.com, scott.hwang@peertec.com
+#
+# This boto3 script uses the AWS Cost Explorer API to query the
+# billing data from the previous day for PROD envo. Extracted data
+# includes the following:
+# - A. Daily Bill by Service Type
+#   + EC2 Instances
+#   + EC2 Other
+#   + EC2 Load Balancer
+#   + Cloudwatch
+#   + RDB Service
+#   + Elasticache Redis
+#   + SNS
+#   + AWS WAF
+#   + SQS
+# - B. Reserved Instance (RI) Utilization (both PROD & DEV & MGMT)
+# - C. Detailed line-item breakdown by Service Type (TODO)
+#
+# Important billing data will be extracted from the JSON results and
+# formatted so they can be sent to Slack.
+
+
+import argparse
+import boto3
+import datetime
+from decimal import Decimal
+import json
+import requests
+import time
+
+
+def extract_ce(svc_dict, utype_dict):
+    """
+    dict, dict -> dict
+
+    Given 'svc_dict', a nested dict of lists containing Cost Explorer
+    (CE) data grouped by Service and 'utype_dict', a nested dict of
+    lists containing CE data grouped by both Operation and Usage_Type,
+    return a dict containing all non-RI CE billing data for 'EC2',
+    'EC2-Other', 'Load Balancer', 'Cloudwatch', 'RDB', 'Elasticache',
+    'S3', and line items for each service.
+    """
+    res = dict()
+    svcsList = [
+        'EC2 - Other',
+        'Amazon Elastic Compute Cloud - Compute',
+        'Amazon Elastic Load Balancing',
+        'Amazon Relational Database Service',
+        'Amazon ElastiCache',
+        'Amazon Route 53',
+        'Amazon Simple Notification Service',
+        'Amazon Simple Storage Service',
+        'AmazonCloudWatch',
+        'AWS WAF',
+        'Amazon Simple Queue Service'
+    ]
+    # utypeList elements are created by joining the keyvals from
+    # GroupBy 'OPERATION' and 'USAGE_TYPE' with the string ': '
+    svc_to_utype = {
+        'EC2 - Other':
+        ['CreateSnapshot: APN2-EBS:SnapshotUsage',
+         'CreateVolume: APN2-EBS:VolumeUsage',
+         'CreateVolume-Gp2: APN2-EBS:VolumeUsage.gp2',
+         'CreateVolume-P-IOPS: APN2-EBS:VolumeP-IOPS.piops',
+         'CreateVolume-P-IOPS: APN2-EBS:VolumeUsage.piops',
+         'EBS:IO-Read: APN2-EBS:VolumeIOUsage',
+         'EBS:IO-Write: APN2-EBS:VolumeIOUsage',
+         'NatGateway: APN2-NatGateway-Bytes',
+         'NatGateway: APN2-NatGateway-Hours',
+         'AssociateAddressVPC: APN2-ElasticIP:IdleAddress'
+        ],
+
+        'Amazon Elastic Compute Cloud - Compute':
+        ['RunInstances: APN2-BoxUsage:c5.large',
+         'RunInstances: APN2-BoxUsage:m5.large',
+         'RunInstances: APN2-BoxUsage:m5.xlarge',
+         'RunInstances:0002: APN2-BoxUsage:m4.large',
+         'RunInstances: APN2-BoxUsage:t2.large',
+         'RunInstances: APN2-BoxUsage:t2.medium',
+         'RunInstances: APN2-BoxUsage:t2.micro',
+         'RunInstances: APN2-BoxUsage:t2.nano',
+         'RunInstances: APN2-BoxUsage:t2.small',
+         'RunInstances: APN2-BoxUsage:t3.large',
+         'RunInstances: APN2-BoxUsage:t3.xlarge',
+         'RunInstances: APN2-BoxUsage:t3.medium',
+         'RunInstances: APN2-BoxUsage:t3.micro',
+         'RunInstances: APN2-BoxUsage:t3.nano'
+         'RunInstances: APN2-BoxUsage:t3.small',
+         'RunInstances: APN2-DataTransfer-Out-Bytes'
+        ],
+
+        'Amazon Route 53':
+        ['NS: DNS-Queries',
+         'MX: DNS-Queries',
+         'A: DNS-Queries',
+         'A: Intra-AWS-DNS-Queries',
+         'AAAA: DNS-Queries',
+         'ANY: DNS-Queries',
+         'CAA: DNS-Queries',
+         'CNAME: DNS-Queries',
+         'TXT: DNS-Queries'
+        ],
+
+        'Amazon Elastic Load Balancing':
+        ['LoadBalancing: APN2-DataProcessing-Bytes',
+         'LoadBalancing: APN2-DataTransfer-In-Bytes',
+         'LoadBalancing: APN2-DataTransfer-Out-Bytes',
+         'LoadBalancing: APN2-LoadBalancerUsage',
+         'LoadBalancing-PublicIP-Out: APN2-DataTransfer-Regional-Bytes',
+         'LoadBalancing:Application: APN2-LCUUsage',
+         'LoadBalancing:Application: APN2-LoadBalancerUsage'
+        ],
+
+        'Amazon Simple Storage Service':
+        ['StandardIAStorage: APN2-TimedStorage-SIA-ByteHrs',
+         'StandardStorage: APN2-TimedStorage-ByteHrs',
+         'CompleteMultipartUpload: APN2-Requests-Tier1',
+         'CopyObject: APN2-Requests-Tier1'
+        ],
+
+        'AmazonCloudWatch':
+        ['Unknown: APN2-CW:AlarmMonitorUsage',
+         'Unknown: APN2-CW:HighResAlarmMonitorUsage',
+         'Unknown: CW:AlarmMonitorUsage',
+         'PutLogEvents: APN2-DataProcessing-Bytes',
+         'PutMetricData: APN2-CW:Requests',
+         'MetricStorage: APN2-CW:MetricMonitorUsage',
+         'MetricStorage:AWS/Beanstalk: APN2-CW:MetricMonitorUsage',
+         'MetricStorage:AWS/CloudWatchLogs: APN2-CW:MetricMonitorUsage',
+         'MetricStorage:AWS/EC2: APN2-CW:MetricMonitorUsage',
+         'DashboardHour: DashboardsUsageHour-Basic',
+         'DashboardHour: DashboardsUsageHour',
+        ],
+
+        'Amazon ElastiCache':
+        ['CreateCacheCluster:0002: APN2-NodeUsage:cache.m4.xlarge'],
+
+        'Amazon Relational Database Service':
+        ['CreateDBInstance: APN2-Aurora:StorageIOUsage',
+         'CreateDBInstance: APN2-Aurora:StorageUsage',
+         'CreateDBInstance:0016: APN2-InstanceUsage:db.r4.xlarge'
+        ],
+    }
+
+
+    lod0 = svc_dict['ResultsByTime'][0]['Groups']
+    lod1 = utype_dict['ResultsByTime'][0]['Groups']
+
+    #print("lod0 is %s" %lod0)
+    for i in range(len(lod0)):
+        service_name = lod0[i]['Keys'][0]
+        if service_name in svcsList:
+               res[service_name] = dict()
+               res[service_name]['Cost'] = lod0[i]['Metrics'][
+                   'UnblendedCost']['Amount']
+    #print("results dict is %s" %res)
+
+    for j in range(len(lod1)):
+        for k in svc_to_utype:
+            #print("key from svc_to_utype is %s" %k)
+            joinKeys = ': '.join(lod1[j]['Keys'])
+            #print("joined Key is %s" %joinKeys)
+            if joinKeys in svc_to_utype[k]:
+                res[k][joinKeys] = lod1[j]['Metrics']['UnblendedCost']['Amount']
+
+    return res
+
+
+# TODO: rewrite the function below and other functions so that
+# they take an object of type 'CostExplorerClient' instead of a
+# regular dict. This will allow me to remove cost explorer
+# filter/queries from main() and place them within specific
+# functions themselves. This has the benefit of enabling code
+# reuse if this program is imported from other scripts.
+
+
+def prez_extract_ce(res_dict, rpt_date, outfile):
+    """
+    dictOfDict, str, str -> text to stdout, file
+
+    This function will pretty print the grouped Cost Explorer results
+    from extract_ce() to stdout and to a file. It 'presents' results
+    in an easy-to-read format
+
+    Note that extract_ce generates 'res_dict' from a combination of
+    *cost by service* (coarse) and *cost by utilization type* (detailed).
+    The dict structure from *cost by service* is different from that
+    of the latter. To get cost data from the former, you must specify
+    the key '<service name>', followed by key 'Cost', whereas getting
+    cost data from *cost by utilization type* requires the key
+    '<service name>' followed by the key '<custom utype string>'. In
+    the latter, there is no key 'Cost'.
+
+    Also note that all possible keys defined in 'extract_ce()' may not
+    be represented in 'res_dict' on a given day. For example, if you
+    are not using any 't2.nano' instances, the key
+    'RunInstances: APN2-BoxUsage:t2.nano' will not exist.
+    """
+    ## EC2 COMPUTE
+    ## from *cost by service* ##
+    ec2_compute = Decimal(res_dict[
+        'Amazon Elastic Compute Cloud - Compute'][
+            'Cost'])
+    ##-----------------------------------------------------##
+    ## from *cost by utilization type* ##
+
+    #ec2_compute_c5_large = Decimal(res_dict[
+    #    'Amazon Elastic Compute Cloud - Compute'].get(
+    #        'RunInstances: APN2-BoxUsage:c5.large', 0))
+
+    #ec2_compute_egress_data = Decimal(res_dict[
+    #    'Amazon Elastic Compute Cloud - Compute'].get(
+    #        'RunInstances: APN2-DataTransfer-Out-Bytes',0))
+
+    ##-----------------------------------------------------##
+
+    ## EC2 OTHER
+    ## from *cost by service ##
+    ec2_other = Decimal(res_dict['EC2 - Other']['Cost'])
+    ##-----------------------------------------------------##
+    ## from *cost by utilization type* ##
+    #ec2_other_idle_eip = Decimal(res_dict['EC2 - Other'].get(
+    #    'AssociateAddressVPC: APN2-ElasticIP:IdleAddress', 0))
+    #ec2_other_ebs_snapshot_usage = Decimal(res_dict['EC2 - Other'].get(
+    #    'CreateSnapshot: APN2-EBS:SnapshotUsage', 0))
+    #ec2_other_ebs_vol_usage = Decimal(res_dict['EC2 - Other'].get(
+    #    'CreateVolume: APN2-EBS:VolumeUsage', 0))
+    #ec2_other_ebs_vol_usage_gp2 = Decimal(res_dict['EC2 - Other'].get(
+    #    'CreateVolume-Gp2: APN2-EBS:VolumeUsage.gp2', 0))
+
+    ##-----------------------------------------------------##
+
+    ## RELATIONAL DATABASE SERVICE
+    ## from *cost by service* ##
+    rdb_service = Decimal(res_dict['Amazon Relational Database Service'][
+        'Cost'])
+    ##-----------------------------------------------------##
+    ## from *cost by utilization type* ##
+
+    ## CLOUDWATCH
+    ## from *cost by service* ##
+    cloudwatch = Decimal(res_dict['AmazonCloudWatch']['Cost'])
+    ##-----------------------------------------------------##
+    ## from *cost by utilization type* ##
+    #cw_apn2_alarm_mon_usage = Decimal(res_dict['AmazonCloudWatch'].get(
+    #    'Unknown: APN2-CW:AlarmMonitorUsage', 0))
+    #cw_apn2_highres_alarm_mon_usage = Decimal(res_dict['AmazonCloudWatch'].get(
+    #    'Unknown: APN2-CW:HighResAlarmMonitorUsage', 0))
+
+    ## ELASTICACHE
+    ## from *cost by service* ##
+    ecredis = Decimal(res_dict['Amazon ElastiCache']['Cost'])
+    ##-----------------------------------------------------##
+    ## *from cost by utilization type* ##
+    #ecredis_cache_m4_xlarge = Decimal(res_dict['Amazon ElastiCache'].get(
+    #    'CreateCacheCluster:0002: APN2-NodeUsage:cache.m4.xlarge', 0))
+    ##-----------------------------------------------------##
+
+    ## ELASTIC LOAD BALANCER
+    ## from *cost by service* ##
+    ec2_elb = Decimal(res_dict['Amazon Elastic Load Balancing']['Cost'])
+    ##-----------------------------------------------------##
+    ## from *cost by utilization type*
+    #elb_data_processing_bytes = Decimal(res_dict[
+    #    'Amazon Elastic Load Balancing'].get(
+    #        'LoadBalancing: APN2-DataProcessing-Bytes', 0))
+    ##-----------------------------------------------------##
+
+    ## SIMPLE NOTIFICATION SERVICE
+    ## from *cost by service* ##
+    sns = Decimal(res_dict['Amazon Simple Notification Service']['Cost'])
+    ##-----------------------------------------------------##
+
+    ## Web Application Firewall
+    waf = Decimal(res_dict['AWS WAF']['Cost'])
+
+    ## SIMPLE QUEUE SERVICE
+    ## from *cost by service* ##
+    sqs = Decimal(res_dict['Amazon Simple Queue Service']['Cost'])
+
+    ## TOTAL COST computed from *cost by service*
+    total_cost_svc = (ec2_compute + ec2_other + rdb_service +
+                      cloudwatch + ecredis + ec2_elb + sns + waf + sqs)
+
+    with open(outfile, 'w') as f:
+        print("*TOTAL COST in PROD* on %s:\t*$%s*"
+              %(rpt_date, total_cost_svc.quantize(Decimal("1.00"))))
+        f.write("*TOTAL COST in PROD* on %s:\t*$%s*\n"
+                %(rpt_date, total_cost_svc.quantize(Decimal("1.00"))))
+        print("==================================================")
+        f.write("==================================================\n")
+        print("\t`EC2-compute`:\t$%s"
+              % ec2_compute.quantize(Decimal("1.000")))
+        f.write("\t`EC2-compute`:\t$%s\n"
+              % ec2_compute.quantize(Decimal("1.000")))
+
+        print("\t`EC2-other`:\t$%s"
+              % ec2_other.quantize(Decimal("1.000")))
+        f.write("\t`EC2-other`:\t$%s\n"
+              % ec2_other.quantize(Decimal("1.000")))
+        ##-----------------------------------------------------##
+        print("\t`Cloudwatch`:\t$%s"
+              % cloudwatch.quantize(Decimal("1.000")))
+        f.write("\t`Cloudwatch`:\t$%s\n"
+              % cloudwatch.quantize(Decimal("1.000")))
+        print("\t`RDB Service`:\t$%s"
+              % rdb_service.quantize(Decimal("1.000")))
+        f.write("\t`RDB Service`:\t$%s\n"
+              % rdb_service.quantize(Decimal("1.000")))
+        print("\t`Elasticache`:\t$%s"
+              % ecredis.quantize(Decimal("1.000")))
+        f.write("\t`Elasticache`:\t$%s\n"
+              % ecredis.quantize(Decimal("1.000")))
+        print("\t`EC2 LoadBal`:\t$%s"
+              % ec2_elb.quantize(Decimal("1.000")))
+        f.write("\t`EC2 LoadBal`:\t$%s\n"
+              % ec2_elb.quantize(Decimal("1.000")))
+        print("\t`SNS (noti)`:\t$%s"
+              % sns.quantize(Decimal("1.000")))
+        f.write("\t`SNS (noti)`:\t$%s\n"
+              % sns.quantize(Decimal("1.000")))
+        print("\t`WAF Service`:\t$%s"
+              % waf.quantize(Decimal("1.000")))
+        f.write("\t`WAF Service`:\t$%s\n"
+              % waf.quantize(Decimal("1.000")))
+        print("\t`SQS (Queue)`:\t$%s"
+              % sqs.quantize(Decimal("1.000")))
+        f.write("\t`SQS (Queue)`:\t$%s\n"
+              % sqs.quantize(Decimal("1.000")))
+
+def extract_ce_RI(ri_dict):
+    """
+    dict -> dictOfDicts
+
+    Given 'ri_dict', a nested dict of lists containing Cost Explorer
+    (CE) data grouped by Subscription_Id for Reserved Instances data,
+    return a dict of dicts containing RI CE billing data such as RI
+    utilization (%) and number of instances for each RI type.
+    """
+    res = dict()
+    allRI = ri_dict['UtilizationsByTime'][0]['Groups']
+    #print("length of ri_dict is: %d" % len(allRI))
+    utcnow = datetime.datetime.utcnow()
+
+    t3_nano_Stnd_Dict = dict()
+    t3_nano_Conv_Dict = dict()
+    t2_nano_Stnd_Dict = dict()
+    t2_nano_Conv_Dict = dict()
+    m5_large_Stnd_Dict, m4_large_Stnd_Dict = dict(), dict()
+    c5_large_Stnd_Dict = dict()
+
+    customKeys = ['t3.nano-Standard', 't3.nano-Convertible',
+                  't2.nano-Convertible', 'm5.large-Standard',
+                  'm4.large-Standard', 'c5.large-Standard']
+
+    for num, inst in enumerate(allRI):
+        #print("dict %d: %s" %(i, d0))
+
+        # Check RI contract 'endDate' and 'cancellationDate'
+        ri_end_date_str = inst['Attributes']['endDateTime']
+        ri_cancel_date_str = inst['Attributes']['cancellationDateTime']
+        ri_end_datetime_obj = datetime.datetime.strptime(
+            ri_end_date_str[0:10], '%Y-%m-%d')
+        ri_cancel_datetime_obj = datetime.datetime.strptime(
+            ri_cancel_date_str[0:10], '%Y-%m-%d')
+
+        #print("customKey: %s" % customKey)
+        #print("ri_cancel_datetime_obj is %s" %ri_cancel_datetime_obj)
+        #print("ri_end_datetime_obj is %s" %ri_cancel_datetime_obj)
+
+        # Only add RI data to dict if the RI cancel/end date g.t.
+        # today's UTC date
+        if ri_end_datetime_obj > utcnow:
+
+            # in order to calculate weighted average of Utilization% for
+            # each RI subscription type, first collate number of Instances
+            # and utiliztion % for each subscription and place into
+            # appropriate dict
+            if inst['Attributes']['instanceType'] == 't3.nano':
+                if inst['Attributes']['offeringType'] == 'Standard':
+                    t3_nano_Stnd_Dict[num] = [
+                        inst['Attributes']['numberOfInstances'],
+                        inst['Utilization']['UtilizationPercentage']
+                        ]
+                elif inst['Attributes']['offeringType'] == 'Convertible':
+                    t3_nano_Conv_Dict[num] = [
+                        inst['Attributes']['numberOfInstances'],
+                        inst['Utilization']['UtilizationPercentage']
+                        ]
+            elif inst['Attributes']['instanceType'] == 't2.nano':
+                if inst['Attributes']['offeringType'] == 'Standard':
+                    t2_nano_Stnd_Dict[num] = [
+                        inst['Attributes']['numberOfInstances'],
+                        inst['Utilization']['UtilizationPercentage']
+                        ]
+                elif inst['Attributes']['offeringType'] == 'Convertible':
+                    t2_nano_Conv_Dict[num] = [
+                        inst['Attributes']['numberOfInstances'],
+                        inst['Utilization']['UtilizationPercentage']
+                        ]
+            elif inst['Attributes']['instanceType'] == 'm5.large':
+                m5_large_Stnd_Dict[num] = [
+                    inst['Attributes']['numberOfInstances'],
+                    inst['Utilization']['UtilizationPercentage']
+                    ]
+            elif inst['Attributes']['instanceType'] == 'c5.large':
+                c5_large_Stnd_Dict[num] = [
+                    inst['Attributes']['numberOfInstances'],
+                    inst['Utilization']['UtilizationPercentage']
+                    ]
+            elif inst['Attributes']['instanceType'] == 'm4.large':
+                m4_large_Stnd_Dict[num] = [
+                    inst['Attributes']['numberOfInstances'],
+                    inst['Utilization']['UtilizationPercentage']
+                    ]
+
+    # for each dict by instance and subscription type, calculate
+    # the weighted average of utilization %
+
+    ### t3 nano standard
+    t3_nano_std_cnt = 0
+    t3_nano_std_wgtd_sum = 0
+    for e in t3_nano_Stnd_Dict:
+        num_inst = int(t3_nano_Stnd_Dict[e][0])
+        t3_nano_std_cnt += num_inst
+        pct_used = float(t3_nano_Stnd_Dict[e][1])/100
+        t3_nano_std_wgtd_sum += num_inst * pct_used
+    t3_nano_std_wgtd_avg = t3_nano_std_wgtd_sum / t3_nano_std_cnt
+
+    ### t3 nano convertible
+    t3_nano_conv_cnt = 0
+    t3_nano_conv_wgtd_sum = 0
+    for e in t3_nano_Conv_Dict:
+        num_inst = int(t3_nano_Conv_Dict[e][0])
+        t3_nano_conv_cnt += num_inst
+        pct_used = float(t3_nano_Conv_Dict[e][1])/100
+        t3_nano_conv_wgtd_sum += num_inst * pct_used
+    t3_nano_conv_wgtd_avg = t3_nano_conv_wgtd_sum / t3_nano_conv_cnt
+
+    ### t2 nano convertible
+    t2_nano_conv_cnt = 0
+    t2_nano_conv_wgtd_sum = 0
+    for e in t2_nano_Conv_Dict:
+        num_inst = int(t2_nano_Conv_Dict[e][0])
+        t2_nano_conv_cnt += num_inst
+        pct_used = float(t2_nano_Conv_Dict[e][1])/100
+        t2_nano_conv_wgtd_sum += num_inst * pct_used
+    t2_nano_conv_wgtd_avg = t2_nano_conv_wgtd_sum / t2_nano_conv_cnt
+
+    ### m5 large standard
+    m5_large_std_cnt = 0
+    m5_large_std_wgtd_sum = 0
+    for e in m5_large_Stnd_Dict:
+        num_inst = int(m5_large_Stnd_Dict[e][0])
+        m5_large_std_cnt += num_inst
+        pct_used = float(m5_large_Stnd_Dict[e][1])/100
+        m5_large_std_wgtd_sum += num_inst * pct_used
+    m5_large_std_wgtd_avg = m5_large_std_wgtd_sum / m5_large_std_cnt
+
+    ### m4 large standard
+    m4_large_std_cnt = 0
+    m4_large_std_wgtd_sum = 0
+    for e in m4_large_Stnd_Dict:
+        num_inst = int(m4_large_Stnd_Dict[e][0])
+        m4_large_std_cnt += num_inst
+        pct_used = float(m4_large_Stnd_Dict[e][1])/100
+        m4_large_std_wgtd_sum += num_inst * pct_used
+    m4_large_std_wgtd_avg = m4_large_std_wgtd_sum / m4_large_std_cnt
+
+    ### c5 large standard
+    c5_large_std_cnt = 0
+    c5_large_std_wgtd_sum = 0
+    for e in c5_large_Stnd_Dict:
+        num_inst = int(c5_large_Stnd_Dict[e][0])
+        c5_large_std_cnt += num_inst
+        pct_used = float(c5_large_Stnd_Dict[e][1])/100
+        c5_large_std_wgtd_sum += num_inst * pct_used
+    c5_large_std_wgtd_avg = c5_large_std_wgtd_sum / c5_large_std_cnt
+
+    # add number of instances and utilization % info to result dict
+    for k in customKeys:
+        if k == 't3.nano-Standard':
+            res[k] = {
+                'numberOfInstances': t3_nano_std_cnt,
+                'UtilizationPercentage': Decimal(t3_nano_std_wgtd_avg*100)
+            }
+        elif k == 't3.nano-Convertible':
+            res[k] = {
+                'numberOfInstances': t3_nano_conv_cnt,
+                'UtilizationPercentage': Decimal(t3_nano_conv_wgtd_avg*100)
+            }
+        elif k == 't2.nano-Convertible':
+            res[k] = {
+                'numberOfInstances': t2_nano_conv_cnt,
+                'UtilizationPercentage': Decimal(t2_nano_conv_wgtd_avg*100)
+            }
+        elif k == 'm5.large-Standard':
+            res[k] = {
+                'numberOfInstances': m5_large_std_cnt,
+                'UtilizationPercentage': Decimal(m5_large_std_wgtd_avg*100)
+            }
+        elif k == 'm4.large-Standard':
+            res[k] = {
+                'numberOfInstances': m4_large_std_cnt,
+                'UtilizationPercentage': Decimal(m4_large_std_wgtd_avg*100)
+            }
+        elif k == 'c5.large-Standard':
+            res[k] = {
+                'numberOfInstances': c5_large_std_cnt,
+                'UtilizationPercentage': Decimal(c5_large_std_wgtd_avg*100)
+            }
+
+    return res
+
+
+def prez_extract_ce_RI(ri_dict, rpt_date, outfile):
+    """
+    dictOfDict, str, str -> text to stdout, file
+
+    'ri_dict' contains Reserved Instance (RI) utilization percentage
+    by instance type as well as the number of instances
+    reserved. 'rpt_date' is a date in YYYY-MM-DD format converted to
+    str type from datetime type. This function returns text to stdout
+    and writes the same info to file with filename denoted by str var
+    'outfile'.
+    """
+    ri_typesL = ['m5.large-Standard', 'c5.large-Standard',
+                 'm4.large-Standard', 't2.nano-Convertible',
+                 't3.nano-Convertible', 't3.nano-Standard']
+
+    for ri_type in ri_typesL:
+        if ri_type in ri_dict.keys():
+            if ri_type == 'm5.large-Standard':
+                m5_large_ri_std_usage_pct = Decimal(
+                    ri_dict['m5.large-Standard']['UtilizationPercentage'])
+                m5_large_ri_std_num_inst = Decimal(
+                    ri_dict['m5.large-Standard']['numberOfInstances'])
+            elif ri_type == 'c5.large-Standard':
+                c5_large_ri_std_usage_pct = Decimal(
+                    ri_dict['c5.large-Standard']['UtilizationPercentage'])
+                c5_large_ri_std_num_inst = Decimal(
+                    ri_dict['c5.large-Standard']['numberOfInstances'])
+            elif ri_type == 'm4.large-Standard':
+                m4_large_ri_std_usage_pct = Decimal(
+                    ri_dict['m4.large-Standard']['UtilizationPercentage'])
+                m4_large_ri_std_num_inst = Decimal(
+                    ri_dict['m4.large-Standard']['numberOfInstances'])
+            elif ri_type == 't2.nano-Convertible':
+                t2_nano_ri_conv_usage_pct = Decimal(
+                    ri_dict['t2.nano-Convertible']['UtilizationPercentage'])
+                t2_nano_ri_conv_num_inst = Decimal(
+                    ri_dict['t2.nano-Convertible']['numberOfInstances'])
+            elif ri_type == 't3.nano-Convertible':
+                t3_nano_ri_conv_usage_pct = Decimal(
+                    ri_dict['t3.nano-Convertible']['UtilizationPercentage'])
+                t3_nano_ri_conv_num_inst = Decimal(
+                    ri_dict['t3.nano-Convertible']['numberOfInstances'])
+            elif ri_type == 't3.nano-Standard':
+                t3_nano_ri_std_usage_pct = Decimal(
+                    ri_dict['t3.nano-Standard']['UtilizationPercentage'])
+                t3_nano_ri_std_num_inst = Decimal(
+                    ri_dict['t3.nano-Standard']['numberOfInstances'])
+        else:  # if key 'ri_type' is not found in 'ri_dict', set vals to 0
+            if ri_type == 'm5.large-Standard':
+                m5_large_ri_std_usage_pct = Decimal(0)
+                m5_large_ri_std_num_inst = Decimal(0)
+            elif ri_type == 'c5.large-Standard':
+                c5_large_ri_std_usage_pct = Decimal(0)
+                c5_large_ri_std_num_inst = Decimal(0)
+            elif ri_type == 'm4.large-Standard':
+                m4_large_ri_std_usage_pct = Decimal(0)
+                m4_large_ri_std_num_inst = Decimal(0)
+            elif ri_type == 't2.nano-Convertible':
+                t2_nano_ri_conv_usage_pct = Decimal(0)
+                t2_nano_ri_conv_num_inst = Decimal(0)
+            elif ri_type == 't3.nano-Convertible':
+                t3_nano_ri_conv_usage_pct = Decimal(0)
+                t3_nano_ri_conv_num_inst = Decimal(0)
+            elif ri_type == 't3.nano-Standard':
+                t3_nano_ri_std_usage_pct = Decimal(0)
+                t3_nano_ri_std_num_inst = Decimal(0)
+
+    with open(outfile, 'w') as g:
+        print("*RESERVED INSTANCE USAGE DATA* on %s" %rpt_date)
+        g.write("*RESERVED INSTANCE USAGE DATA* on %s\n" % rpt_date)
+        print("============================================")
+        g.write("============================================\n")
+        print("\t`t2.nano RI Convertible %% used`:\t%s%%"
+              % t2_nano_ri_conv_usage_pct.quantize(Decimal("1.00")))
+        g.write("\t`t2.nano RI Convertible %% used`:\t%s%%\n"
+                % t2_nano_ri_conv_usage_pct.quantize(Decimal("1.00")))
+        print("\t`t2.nano RI Convertible 수량`:\t\t%s"
+              % t2_nano_ri_conv_num_inst)
+        g.write("\t`t2.nano RI Convertible 수량`:\t\t\t%s\n"
+                % t2_nano_ri_conv_num_inst)
+        ##-----------------------------------------------------##
+        print("\t`t3.nano RI Convertible %% used`:\t%s%%"
+               % t3_nano_ri_conv_usage_pct.quantize(Decimal("1.00")))
+        g.write("\t`t3.nano RI Convertible %% used`:\t%s%%\n"
+               % t3_nano_ri_conv_usage_pct.quantize(Decimal("1.00")))
+        print("\t`t3.nano RI Convertible 수량`:\t\t%s"
+              % t3_nano_ri_conv_num_inst)
+        g.write("\t`t3.nano RI Convertible 수량`:\t\t\t%s\n"
+                % t3_nano_ri_conv_num_inst)
+        ##-----------------------------------------------------##
+        print("\t`t3.nano RI Standard %% used`:\t\t%s%%"
+               % t3_nano_ri_std_usage_pct.quantize(Decimal("1.00")))
+        g.write("\t`t3.nano RI Standard %% used`:\t\t%s%%\n"
+               % t3_nano_ri_std_usage_pct.quantize(Decimal("1.00")))
+        print("\t`t3.nano RI Standard 수량`:\t\t%s"
+              % t3_nano_ri_std_num_inst)
+        g.write("\t`t3.nano RI Standard 수량`:\t\t\t%s\n"
+                % t3_nano_ri_std_num_inst)
+        ##-----------------------------------------------------##
+        print("\t`m5.large RI Standard %% used`:\t\t%s%%"
+              % m5_large_ri_std_usage_pct.quantize(Decimal("1.00")))
+        g.write("\t`m5.large RI Standard %% used`:\t\t%s%%\n"
+                % m5_large_ri_std_usage_pct.quantize(Decimal("1.00")))
+        print("\t`m5.large RI Standard 수량`:\t\t%s"
+              % m5_large_ri_std_num_inst)
+        g.write("\t`m5.large RI Standard 수량`:\t\t\t%s\n"
+                % m5_large_ri_std_num_inst)
+        ##-----------------------------------------------------##
+        print("\t`c5.large RI Standard %% used`:\t\t%s%%"
+              % c5_large_ri_std_usage_pct.quantize(Decimal("1.00")))
+        g.write("\t`c5.large RI Standard %% used`:\t\t%s%%\n"
+                % c5_large_ri_std_usage_pct.quantize(Decimal("1.00")))
+        print("\t`c5.large RI Standard 수량`:\t\t%s"
+              % c5_large_ri_std_num_inst)
+        g.write("\t`c5.large RI Standard 수량`:\t\t\t%s\n"
+                % c5_large_ri_std_num_inst)
+        ##-----------------------------------------------------##
+        print("\t`m4.large RI Standard %% used`:\t\t%s%%"
+              % m4_large_ri_std_usage_pct.quantize(Decimal("1.00")))
+        g.write("\t`m4.large RI Standard %% used`:\t\t%s%%\n"
+                % m4_large_ri_std_usage_pct.quantize(Decimal("1.00")))
+        print("\t`m4.large RI Standard 수량`:\t\t%s"
+              % m4_large_ri_std_num_inst)
+        g.write("\t`m4.large RI Standard 수량`:\t\t\t%s\n"
+                % m4_large_ri_std_num_inst)
+
+
+def extract_ec2_units(ec2resobj):
+    """
+    ec2Resource Object -> dictOfInts
+
+    Given a "session.resource('ec2')" object, return a dictOfInts
+    containing the count of 't2.nano', 't3.nano', 'm4.large', 'm5.large',
+    and 'c5.large' basic units for instances in the state 'running'.
+    """
+    resp = ec2resobj.instances.filter(
+        Filters = [
+            {
+                'Name': 'instance-state-name',
+                'Values': ['running']
+            }
+        ]
+    )
+
+    retD = dict()
+    # declare ec2 basic unit counters
+    t2_nano_units, t3_nano_units, m4_large_units = 0, 0, 0
+    m5_large_units, c5_large_units = 0, 0
+    # dicts mapping ec2 instance type to number of basic units
+    t2_nano_map = {'t2.nano': 1, 't2.micro': 2, 't2.small': 4,
+                   't2.medium': 8, 't2.large': 16, 't2.xlarge': 32}
+    t3_nano_map = {'t3.nano': 1, 't3.micro': 2, 't3.small': 4,
+                   't3.medium': 8, 't3.large': 16, 't3.xlarge': 32}
+    m4_large_map = {'m4.large': 1, 'm4.xlarge': 2, 'm4.2xlarge': 4}
+    m5_large_map = {'m5.large': 1, 'm5.xlarge': 2, 'm5.2xlarge': 4}
+    c5_large_map = {'c5.large': 1, 'c5.xlarge': 2, 'c5.2xlarge': 4}
+
+    for inst in resp:
+        instType = inst.instance_type
+        if 't2' in instType:
+            t2_nano_units += t2_nano_map[instType]
+        elif 't3' in instType:
+            t3_nano_units += t3_nano_map[instType]
+        elif 'm4' in instType:
+            m4_large_units += m4_large_map[instType]
+        elif 'm5' in instType:
+            m5_large_units += m5_large_map[instType]
+        elif 'c5' in instType:
+            c5_large_units += c5_large_map[instType]
+
+    retD = {
+        't2.nano': t2_nano_units,
+        't3.nano': t3_nano_units,
+        'm4.large': m4_large_units,
+        'm5.large': m5_large_units,
+        'c5.large': c5_large_units
+    }
+
+    return retD
+
+
+def sum_ec2_units(*dictz):
+    """
+    dictOfInts, dictOfInts -> dictOfInts
+
+    Given an arbitrary number of dicts in *dictv  with keys
+    corresponding to EC2 basic instance types 't2.nano', 't3.nano',
+    'm5.large' etc, and keyvals corresponding to integer counts for
+    each basic instance type, combine the keyvalues for each instance
+    type key.
+    """
+    valid_keys = ['t2.nano', 't3.nano', 'm4.large', 'm5.large',
+                  'c5.large']
+    total_cntD = dict()
+
+    for k in valid_keys:
+        mycnt = 0
+        for mydict in dictz:
+            mycnt += mydict.get(k, 0)
+        total_cntD[k] = mycnt
+
+    return total_cntD
+
+
+def prez_RI_vs_ec2_units(ri_dict, ec2_dict, rpt_date, outfile):
+    """
+    dict, dict, str, str -> stdout, file
+
+    'ri_dict' contains RI utilization % and RI count for each RI
+    contract type.
+
+    'ec2_dict' contains the converted unit count for each ec2
+    instance type that GDAC uses across AWS PROD and AWS DEV
+
+    'rpt_date' is a date string in YYYY-MM-DD format converted
+    from type 'datetime'.
+
+    This function prints the number of used ec2 base units per type
+    alongside the number of contracted ec2 RI units per type. i.e.,
+
+    t2.nano units 사용: 120    t2.nano RI units 구매: 118
+    t3.nano units 사용: 286    t3.nano RI units 구매: 326
+    ...
+    """
+    # Combine RI convertible + standard counts for each instance
+    # type
+    ri_t2_tot_count = (
+        ri_dict['t2.nano-Convertible']['numberOfInstances']
+        )
+    ri_t3_tot_count = (
+        ri_dict['t3.nano-Convertible']['numberOfInstances'] +
+        ri_dict['t3.nano-Standard']['numberOfInstances']
+        )
+    ri_m4_tot_count = (
+        ri_dict['m4.large-Standard']['numberOfInstances']
+        )
+    ri_m5_tot_count = (
+        ri_dict['m5.large-Standard']['numberOfInstances']
+        )
+    ri_c5_tot_count = (
+        ri_dict['c5.large-Standard']['numberOfInstances']
+        )
+
+    # Calculate the number of RI units used from utilization %
+    # and RI numOfInstances data
+    ri_t2_used_count = (
+        ri_dict['t2.nano-Convertible']['numberOfInstances'] *
+        ri_dict['t2.nano-Convertible']['UtilizationPercentage']/100
+        )
+    ri_t3_used_count = (
+        (
+            ri_dict['t3.nano-Convertible']['numberOfInstances'] *
+            ri_dict['t3.nano-Convertible']['UtilizationPercentage']/100
+        )
+        +
+        (
+            ri_dict['t3.nano-Standard']['numberOfInstances'] *
+            ri_dict['t3.nano-Standard']['UtilizationPercentage']/100
+        )
+    )
+    ri_m4_used_count = (
+        ri_dict['m4.large-Standard']['numberOfInstances'] *
+        ri_dict['m4.large-Standard']['UtilizationPercentage']/100
+        )
+    ri_m5_used_count = (
+        ri_dict['m5.large-Standard']['numberOfInstances'] *
+        ri_dict['m5.large-Standard']['UtilizationPercentage']/100
+        )
+    ri_c5_used_count = (
+        ri_dict['c5.large-Standard']['numberOfInstances'] *
+        ri_dict['c5.large-Standard']['UtilizationPercentage']/100
+        )
+
+    with open(outfile, 'w') as f:
+        print("*EC2 USED vs RI USED PROD+DEV+MGMT* on %s" % rpt_date)
+        f.write("*EC2 USED vs RI USED PROD+DEV+MGMT* on %s\n" % rpt_date)
+        print("=============================================")
+        f.write("=============================================\n")
+        print("`t2.nano EC2 used`: %d"
+              "\t`t2.nano RI used/total`: %.2f/%d"
+              %(ec2_dict['t2.nano'], ri_t2_used_count, ri_t2_tot_count))
+        f.write("`t2.nano EC2 used`: %d" %ec2_dict['t2.nano'])
+        f.write("\t`t2.nano RI used/total`: %.2f/%d\n"
+                %(ri_t2_used_count, ri_t2_tot_count))
+        print("`t3.nano EC2 used`: %d"
+              "\t`t3.nano RI used/total`: %.2f/%d"
+              %(ec2_dict['t3.nano'], ri_t3_used_count, ri_t3_tot_count))
+        f.write("`t3.nano EC2 used`: %d" %ec2_dict['t3.nano'])
+        f.write("\t`t3.nano RI used/total`: %.2f/%d\n"
+                %(ri_t3_used_count, ri_t3_tot_count))
+        print("`m4.large EC2 used`: %d"
+              "\t`m4.large RI used/total`: %.2f/%d"
+              %(ec2_dict['m4.large'], ri_m4_used_count, ri_m4_tot_count))
+        f.write("`m4.large EC2 used`: %d" %ec2_dict['m4.large'])
+        f.write("\t`m4.large RI used/total`: %.2f/%d\n"
+                %(ri_m4_used_count, ri_m4_tot_count))
+        print("`m5.large EC2 used`: %d"
+              "\t`m5.large RI used/total`: %.2f/%d"
+              %(ec2_dict['m5.large'], ri_m5_used_count, ri_m5_tot_count))
+        f.write("`m5.large EC2 used`: %d" %ec2_dict['m5.large'])
+        f.write("\t`m5.large RI used/total`: %.2f/%d\n"
+                %(ri_m5_used_count, ri_m5_tot_count))
+        print("`c5.large EC2 used`: %d"
+              "\t`c5.large RI used/total`: %.2f/%d"
+              %(ec2_dict['c5.large'], ri_c5_used_count, ri_c5_tot_count))
+        f.write("`c5.large EC2 used`: %d" %ec2_dict['c5.large'])
+        f.write("\t`c5.large RI used/total`: %.2f/%d\n"
+                %(ri_c5_used_count, ri_c5_tot_count))
+
+
+def send_to_slack(filename, webhook_url, username):
+    """
+    str, str -> int
+
+    Given a filename (str) and webhook_url (str), send a json
+    payload in an http POST request to Slack http endpoint for
+    a Slack channel. Returns an http status code (integer)
+    """
+    with open(filename, 'r') as f:
+        results = f.read()
+
+    payload = {
+        "username" : username,
+        "text" : results
+    }
+
+    print("Sending payload to slack channel %s ..." %webhook_url)
+
+    resp = requests.post(
+        webhook_url,
+        json.dumps(payload),
+        headers = {'Content-Type': 'application/json'}
+        )
+
+    return resp.status_code
+
+
+def main():
+
+    # Boilerplate for reading in arguments
+    parser = argparse.ArgumentParser(
+        description="This program takes a single optional argument "
+                    "'--mode' which can be one of 'test' and 'real'. "
+                    "Test mode does not send results to Slack.")
+    parser.add_argument('--mode', type = str, nargs = '?',
+                        default = 'real', const = 'real',
+                        help = "optional argument, one of 'test' or 'real'."
+                        "'test' only prints results to stdout.")
+    args = parser.parse_args()
+
+    # datetime-related vars
+    UTC = datetime.datetime.utcnow()
+    KST = UTC + datetime.timedelta(days = 9/24) # KST is UTC + 9
+    EST = KST - datetime.timedelta(days = 1)
+    EST2 = KST - datetime.timedelta(days = 2)
+    Tstart = EST2.strftime('%Y-%m-%d')
+    Tend = EST.strftime('%Y-%m-%d')
+
+    ### output files ###
+    file_path = '/home/ec2-user/bin/'
+    f_genl_cost = file_path + 'cost_explorer_daily_prod_' + Tend + '.txt'
+    f_RI_data = file_path + 'cost_explorer_RI_daily_prod+dev+mgmt_' + Tend + '.txt'
+    f_ec2_vs_RI = (file_path + 'ec2_unit_count_vs_RI_count_prod_dev_mgmt_'
+                 + Tend + '.txt')
+    ###--------------###
+
+    # boto3 session vars
+    session = boto3.Session(profile_name = 'prod_ce_full_ec2_ro')
+    sessionD = boto3.Session(profile_name = 'dev_ce_full_ec2_ro')
+    sessionM = boto3.Session(profile_name = 'mgmt_ce_full_ec2_ro')
+    ceClient = session.client('ce')  # AWS PROD & DEV & MGMTacct is linked
+    # boto3 resource object for AWS PROD ec2
+    ec2Resource = session.resource('ec2')
+    # boto3 resource object for AWS DEV ec2
+    ec2ResourceD = sessionD.resource('ec2')
+    # boto3 resource object for AWS MGMT ec2
+    ec2ResourceM = sessionM.resource('ec2')
+
+
+    # dict with key = 'instanceType', keyval = 'instanceCount' in
+    # AWS PROD
+    ec2_units_prod = extract_ec2_units(ec2Resource)
+    # dict with key = 'instanceType', keyval = 'instanceCount' in
+    # AWS DEV 
+    ec2_units_dev = extract_ec2_units(ec2ResourceD)
+    # dict with key = 'instanceType', keyval = 'instanceCount' in
+    # AWS MGMT
+    ec2_units_mgmt = extract_ec2_units(ec2ResourceM)
+
+    # dict with key = 'instanceType', keyval = 'instanceCount' total
+    # sum across AWS PROD and DEV and MGMT
+
+    ### INPUT FOR prez_RI_vs_ec2_units()! ###
+    ec2_units_tot = sum_ec2_units(ec2_units_prod, ec2_units_dev, ec2_units_mgmt)
+    ### --------------------------------- ###
+
+    # Slack 'aws_cost' channel webhook URL
+    slack_webhook = 'https://hooks.slack.com/services/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'
+
+
+    #print("RI dict raw: %s" % ri_info_dict)
+
+    resp_by_service = ceClient.get_cost_and_usage(
+        TimePeriod = {
+            'Start': Tstart,
+            'End': Tend,
+        },
+        Granularity = 'DAILY',
+        Metrics = [
+            'UnblendedCost',
+        ],
+        GroupBy = [
+            {
+                'Type': 'DIMENSION',
+                'Key': 'SERVICE'
+            }
+        ]
+    )
+
+    resp_svc_detailed = ceClient.get_cost_and_usage(
+        TimePeriod = {
+            'Start': Tstart,
+            'End': Tend,
+        },
+        Granularity = 'DAILY',
+        Metrics = [
+            'UnblendedCost',
+        ],
+        GroupBy = [
+            {
+                'Type': 'DIMENSION',
+                'Key': 'OPERATION'
+            },
+            {
+                'Type': 'DIMENSION',
+                'Key': 'USAGE_TYPE'
+            }
+        ]
+    )
+
+    svc_results = extract_ce(resp_by_service, resp_svc_detailed)
+    #print(svc_results)
+    # EC2 instances basic unit count
+
+    prez_extract_ce(svc_results, Tend, f_genl_cost)
+
+    #-------------------------------------------------------
+    # To avoid AWS Cost Explorer API rate limit, sleep for 1s
+    # before querying RI utilization
+    time.sleep(1)
+    resp_RI_usage_pct = ceClient.get_reservation_utilization(
+        TimePeriod = {
+            'Start': Tstart,
+            'End': Tend,
+        },
+        GroupBy = [
+            {
+                'Type': 'DIMENSION',
+                'Key': 'SUBSCRIPTION_ID'
+            },
+        ]
+    )
+
+    # for each key 'instanceType+contractType', store the number of
+    # of instances and the weighted avg utilization %
+
+    ### INPUT FOR prez_RI_vs_ec2_units()! ###
+    ri_info_dict = extract_ce_RI(resp_RI_usage_pct)
+    ### --------------------------------- ###
+
+    # present the raw data from 'ri_info_dict' via markdown-formatted
+    # text and pretty-printed on stdout
+    prez_extract_ce_RI(ri_info_dict, Tend, f_RI_data)
+
+    # present raw data from 'ri_info_dict', 'ec2_prod_dev_total'
+    # side-by-side so you can compare current ec2 usage vs. ec2 RI
+    # purchased
+    prez_RI_vs_ec2_units(ri_info_dict, ec2_units_tot, Tend,
+                         f_ec2_vs_RI)
+
+    if args.mode == 'real':
+        print("Send non-RI Daily Cost Explorer data to Slack")
+        http_status = send_to_slack(f_genl_cost, slack_webhook,
+                                    'AWS_Cost_Explorer PROD')
+        if http_status != 200:
+            print("Sending AWS Cost Explorer data payload to %s FAILED!"
+                  % slack_webhook)
+        else:
+            print("Sending AWS Cost Explorer data payload to %s SUCCESS!"
+                  % slack_webhook)
+    ##-----------------------------------------------------##
+    if args.mode == 'real':
+        print("Send RI Cost Explorer data to Slack")
+        http_status = send_to_slack(f_RI_data, slack_webhook,
+                                    'AWS_RI_Info DEV+PROD+MGMT')
+        if http_status != 200:
+            print("Sending AWS RI usage data payload to %s FAILED!"
+                  % slack_webhook)
+        else:
+            print("Sending AWS RI usage data payload to %s SUCCESS!"
+                  % slack_webhook)
+
+    ##-----------------------------------------------------##
+    if args.mode == 'real':
+        print("Send EC2 used vs RI used/count data to Slack")
+        http_status = send_to_slack(f_ec2_vs_RI, slack_webhook,
+                                    'AWS EC2 USED vs RI USED DEV+PROD+MGMT')
+        if http_status != 200:
+            print("Sending EC2 used vs RI data payload to %s FAILED!"
+                  % slack_webhook)
+        else:
+            print("Sending EC2 used vs RI data payload to %s SUCCESS!"
+                  % slack_webhook)
+
+
+if __name__ == "__main__":
+    main()

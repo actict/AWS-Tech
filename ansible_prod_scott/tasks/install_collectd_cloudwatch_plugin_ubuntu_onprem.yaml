@@ -1,0 +1,46 @@
+- name: Install collectd-core package from default repos
+  apt:
+    name: collectd-core
+    state: present
+  become: True
+
+- name: Install collectd without recommended dependencies
+  apt:
+    name: collectd
+    state: present
+    install_recommends: no
+  become: True
+
+- name: Enable collectd systemd service
+  systemd:
+    name: collectd
+    enabled: yes
+  become: True
+
+- name: Check if collectd-cloudwatch install script has been downloaded
+  stat:
+    path: /home/{{ my_user  }}/setup.py
+  register: stat_result
+
+- name: Download collectd-cloudwatch plugin install script from AWSLABS
+  get_url:
+    url: https://raw.githubusercontent.com/awslabs/collectd-cloudwatch/master/src/setup.py
+    dest: /home/{{ my_user  }}
+    force: yes
+  when: stat_result.stat.exists == False
+
+- name: Make downloaded python install script executable
+  file:
+    path: /home/{{ my_user }}/setup.py
+    mode: "a+x"
+
+- name: Check if collectd-cw plugin has been setup already
+  stat:
+    path: /opt/collectd-plugins/cloudwatch
+  become: True
+  register: stat_result
+
+- name: Run setup.py
+  command: /home/{{ my_user }}setup.py --non_interactive --region ap-northeast-2 --creds_path /home/{{ my_user }}/.aws/credentials --enable_high_resolution_metrics --installation_method recommended
+  become: True
+  when: stat_result.stat.exists == False

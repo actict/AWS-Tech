@@ -1,0 +1,5 @@
+- name: stop service
+  service:
+    name: "{{ svc_name }}"
+    state: stopped
+  become: true

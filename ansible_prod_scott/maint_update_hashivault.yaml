@@ -1,0 +1,8 @@
+- name: playbook to update pkgs and reboot AWS PROD hashivault server
+  hosts: hashivault
+  tasks:
+    - name: update packages on ubuntu server which allows sudo
+      import_tasks: tasks/update_amzlnx2_sudo.yaml
+
+    - name: reboot server which allows sudo
+      import_tasks: tasks/reboot_server_sudo.yaml

@@ -1,0 +1,7 @@
+- name: collectd, cloudwatch, and post-setup AIO for terra-lcd server
+  hosts: terra-lcd
+  vars:
+    my_hosts: terra-lcd
+  tasks:
+    - name: install cloudwatch-agent and configure
+      import_tasks: tasks/install_amzn_cloudwatch_agent_config_ubuntu_generic.yaml

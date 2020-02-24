@@ -1,0 +1,7 @@
+- name: config cloudwatch for peertec server
+  hosts: peertec
+  vars:
+    my_hosts: peertec
+  tasks:
+    - name: install cloudwatch-agent and configure
+      import_tasks: tasks/install_amzn_cloudwatch_agent_ubuntu_generic.yaml

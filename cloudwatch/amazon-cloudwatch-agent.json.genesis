@@ -1,0 +1,46 @@
+{
+  "Agent": {
+    "metrics_collection_interval": 60,
+    "region": "ap-northeast-2",
+    "logfile": "",
+    "debug": false
+  },
+
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          {
+            "file_path": "/var/log/auth.log",
+            "log_group_name": "all_ssh_logs",
+            "log_stream_name": "genesis_{ip_address}_ssh.log",
+            "timezone": "UTC",
+            "encoding": "utf-8"
+          },
+          {
+            "file_path": "/var/log/kern.log",
+            "log_group_name": "genesis_logs",
+            "log_stream_name": "genesis_{ip_address}_kernel_logs",
+            "timezone": "UTC",
+            "encoding": "utf-8"
+          },
+          {
+            "file_path": "/opt/aws/amazon-cloudwatch-agent/logs/amazon-cloudwatch-agent.log",
+            "log_group_name": "genesis_logs",
+            "log_stream_name": "genesis_{ip_address}_amazon-cloudwatch-agent.log",
+            "timezone": "UTC",
+            "encoding": "utf-8"
+          },
+          {
+            "file_path": "/var/log/syslog",
+            "log_group_name": "genesis_logs",
+            "log_stream_name": "genesis_{ip_address}_syslog",
+            "timezone": "UTC",
+            "encoding": "utf-8"
+          }
+        ]
+      }
+    },
+    "log_stream_name":"genesis_log_default"
+  }
+}

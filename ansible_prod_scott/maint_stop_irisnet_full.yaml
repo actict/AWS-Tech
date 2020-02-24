@@ -1,0 +1,7 @@
+- name: playbook to stop service on AWS PROD irisnet-full server
+  hosts: irisnet-full
+  vars:
+    svc_name: irisd.service
+  tasks:
+    - name: stop irisd daemon
+      import_tasks: tasks/stop_service.yaml

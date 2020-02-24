@@ -1,0 +1,11 @@
+- name: update pkg repo on amzlnx1 servers allowing sudo
+
+- set_fact:
+    ansible_facts:
+        pkg_mgr: yum
+
+  yum:
+      name: "*"
+      state: latest
+      update_cache: yes
+  become: true

@@ -1,0 +1,14 @@
+---
+- name: Packages update hashtower server playbook
+  hosts: hashtower
+  become: True
+  tasks:
+      - name: Do an update in Amzlnx
+        yum:
+            name: "*"
+            state: latest
+            update_cache: yes
+
+      - name: Reboot system
+        reboot:
+            reboot_timeout: 120

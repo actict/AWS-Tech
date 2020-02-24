@@ -1,0 +1,60 @@
+{
+  "agent": {
+    "metrics_collection_interval": 60,
+    "region": "ap-northeast-2",
+    "logfile": "",
+    "debug": false
+  },
+
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          {
+            "file_path": "/var/log/messages",
+            "log_group_name": "logger_logs",
+            "log_stream_name": "logger_{ip_address}_messages",
+            "timezone": "UTC",
+            "encoding": "utf-8"
+          },
+          {
+            "file_path": "/var/log/yum.log",
+            "log_group_name": "logger_logs",
+            "log_stream_name": "logger_{ip_address}_yum.log",
+            "timezone": "UTC",
+            "encoding": "utf-8"
+          },
+          {
+            "file_path": "/home/ec2-user/.bash_history",
+            "log_group_name": "all_shell_history",
+            "log_stream_name": "logger{ip_address}_ec2-user_bash_history",
+            "timezone": "UTC",
+            "encoding": "utf-8"
+          },
+          {
+            "file_path": "/root/.bash_history",
+            "log_group_name": "all_shell_history",
+            "log_stream_name": "logger_{ip_address}_root_bash_history",
+            "timezone": "UTC",
+            "encoding": "utf-8"
+          },
+          {
+            "file_path": "/var/log/aide/aide.log",
+            "log_group_name": "all_aide_logs",
+            "log_stream_name": "logger_{ip_address}_aide_log",
+            "timezone": "UTC",
+            "encoding": "utf-8"
+          },
+          {
+            "file_path": "/var/log/secure",
+            "log_group_name": "all_ssh_logs",
+            "log_stream_name": "logger_{ip_address}_ssh.log",
+            "timezone": "UTC",
+            "encoding": "utf-8"
+          }
+        ]
+      }
+    },
+    "log_stream_name":"logger_log_default"
+  }
+}

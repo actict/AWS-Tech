@@ -1,0 +1,7 @@
+- name: collectd, cloudwatch, and post-setup AIO for blockinpress-web server
+  hosts: blockinpress-web
+  vars:
+    my_hosts: blockinpress-web
+  tasks:
+    - name: install cloudwatch-agent and configure
+      import_tasks: tasks/install_amzn_cloudwatch_agent_config_ubuntu_generic.yaml

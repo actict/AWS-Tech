@@ -1,0 +1,7 @@
+- name: playbook to stop service on AWS PROD cosmos-lcd server
+  hosts: cosmoslcd
+  vars:
+    svc_name: gaia-lite.service
+  tasks:
+    - name: stop gaia-lite daemon
+      import_tasks: tasks/stop_service.yaml

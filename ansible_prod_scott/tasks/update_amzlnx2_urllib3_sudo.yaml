@@ -1,0 +1,10 @@
+- name: update pkg repo on amzlnx2 servers allowing sudo(urllib3)
+  shell: pip uninstall urllib3 -y
+  become: true
+
+- name: update pkg repo on amzlnx2 servers allowing sudo(yum)
+  yum:
+    name: "*"
+    state: latest
+    update_cache: yes
+  become: true

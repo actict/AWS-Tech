@@ -1,0 +1,12 @@
+# playbook -i hosts --extra-vars \
+#  "myhost=<specific host or group>"
+- name: playbook to update pkgs and reboot AWS PROD servers
+  hosts: '{{ myhost  }}'
+  tasks:
+    - name: update packages on amzlnx2 server which allows sudo
+      import_tasks: tasks/update_amzlnx2_sudo.yaml
+      when: ansible_distribution == 'Amazon'
+
+    - name: reboot server which allows sudo
+      import_tasks: tasks/reboot_server_sudo.yaml
+      when: ansible_distribution == 'Amazon'

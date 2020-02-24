@@ -1,0 +1,7 @@
+- name: playbook to stop service on AWS PROD terra-full-prod server
+  hosts: terra-full
+  vars:
+    svc_name: terrad.service
+  tasks:
+    - name: stop terrad daemon
+      import_tasks: tasks/stop_service_su.yaml

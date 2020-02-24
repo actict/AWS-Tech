@@ -1,0 +1,8 @@
+- name: playbook to update pkgs and reboot AWS PROD front-2 server
+  hosts: front-2
+  tasks:
+    - name: update packages on ubuntu server which allows sudo
+      import_tasks: tasks/update_amzlnx2_sudo.yaml
+
+    - name: reboot server which allows sudo
+      import_tasks: tasks/reboot_server_sudo.yaml

@@ -1,0 +1,12 @@
+[logger_TB_ERROR_LOG]
+log_group_name = logger_logs
+log_stream_name = logger_{ip_address}_TB_ERROR_LOG
+file = /home/ec2-user/bin/backup_whalex.TB_ERROR_LOG
+
+[logger_syslog]
+log_group_name = logger_logs
+datetime_format = %b %d %H:%M:%S
+file = /var/log/messages
+buffer_duration = 5000
+log_stream_name = logger_{ip_address}_syslog
+initial_position = start_of_file

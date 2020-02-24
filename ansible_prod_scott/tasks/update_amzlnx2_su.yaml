@@ -1,0 +1,9 @@
+- name: update pkg repo on amzlnx2 servers allowing sudo
+
+  yum:
+      name: "*"
+      state: latest
+      update_cache: yes
+  become: true
+  become_method: su
+  become_user: root

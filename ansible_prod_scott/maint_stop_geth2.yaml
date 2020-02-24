@@ -1,0 +1,7 @@
+- name: playbook to stop service on AWS PROD geth2 server
+  hosts: geth2
+  vars:
+    svc_name: geth.service
+  tasks:
+    - name: stop geth daemon
+      import_tasks: tasks/stop_service_su.yaml

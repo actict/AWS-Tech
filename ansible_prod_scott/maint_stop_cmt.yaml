@@ -1,0 +1,7 @@
+- name: playbook to stop service on AWS PROD CMT server
+  hosts: cmt
+  vars:
+    svc_name: travis.service
+  tasks:
+    - name: stop CMT travis daemon
+      import_tasks: tasks/stop_service_su.yaml

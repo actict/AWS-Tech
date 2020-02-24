@@ -1,0 +1,9 @@
+- name: Ansible insert lineinfile
+  lineinfile:
+      dest: /etc/ssh/sshd_config
+      regexp: "{{ item.regexp }}"
+      line: "{{ item.line }}"
+  with_items:
+      - { regexp: 'ClientAliveInterval', line: 'ClientAliveInterval 1800' }
+      - { regexp: 'ClientAliveCountMax', line: 'ClientAliveCountMax 1' }
+  become: true

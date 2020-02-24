@@ -1,0 +1,94 @@
+{
+  "agent": {
+    "metrics_collection_interval": 60,
+    "region": "ap-northeast-2",
+    "logfile": "",
+    "debug": false
+  },
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          {
+            "file_path": "/opt/aws/amazon-cloudwatch-agent/logs/amazon-cloudwatch-agent.log",
+            "log_group_name": "ledger_logs",
+            "log_stream_name": "ledger_{ip_address}_cloudwatch-agent.log",
+            "timezone": "UTC",
+            "encoding": "utf-8"
+          },
+          {
+            "file_path": "/mnt/log/whalex.db*",
+            "log_group_name": "ledger_logs",
+            "log_stream_name": "ledger_{ip_address}_whalex.db_logs",
+            "timezone": "UTC",
+            "encoding": "utf-8"
+          },
+          {
+            "file_path": "/var/log/messages",
+            "log_group_name": "ledger_logs",
+            "log_stream_name": "ledger_{ip_address}_var_log_messages",
+            "timezone": "UTC",
+            "encoding": "utf-8"
+          },
+          {
+            "file_path": "/home/ec2-user/.bash_history",
+            "log_group_name": "all_shell_history",
+            "log_stream_name": "ledger_{ip_address}_ec2-user_bash_history",
+            "timezone": "UTC",
+            "encoding": "utf-8"
+          },
+          {
+            "file_path": "/root/.bash_history",
+            "log_group_name": "all_shell_history",
+            "log_stream_name": "ledger_{ip_address}_root_bash_history",
+            "timezone": "UTC",
+            "encoding": "utf-8"
+          },
+          {
+            "file_path": "/var/log/aide/aide.log",
+            "log_group_name": "all_aide_logs",
+            "log_stream_name": "ledger_{ip_address}_aide_log",
+            "timezone": "UTC",
+            "encoding": "utf-8"
+          },
+          {
+            "file_path": "/var/log/secure",
+            "log_group_name": "all_ssh_logs",
+            "log_stream_name": "ledger_{ip_address}_ssh.log",
+            "timezone": "UTC",
+            "encoding": "utf-8"
+          },
+          {
+            "file_path": "/var/log/ledger-wd/addr_stamp.log",
+            "log_group_name": "ledger_logs",
+            "log_stream_name": "ledger_{ip_address}_addr_stamp",
+            "timezone": "UTC",
+            "encoding": "utf-8"
+          },
+          {
+            "file_path": "/var/log/ledger-wd/peer_msg_sender.log",
+            "log_group_name": "ledger_logs",
+            "log_stream_name": "ledger_{ip_address}_peer_msg_sender",
+            "timezone": "UTC",
+            "encoding": "utf-8"
+          },
+          {
+            "file_path": "/var/log/ledger-wd/wd_proc.log",
+            "log_group_name": "ledger_logs",
+            "log_stream_name": "ledger_{ip_address}_wd_proc",
+            "timezone": "UTC",
+            "encoding": "utf-8"
+          },
+          {
+            "file_path": "/var/log/ledger-wd/wd_req_router.log",
+            "log_group_name": "ledger_logs",
+            "log_stream_name": "ledger_{ip_address}_wd_req_router",
+            "timezone": "UTC",
+            "encoding": "utf-8"
+          }
+        ]
+      }
+    },
+    "log_stream_name":"ledger_log_default"
+  }
+}

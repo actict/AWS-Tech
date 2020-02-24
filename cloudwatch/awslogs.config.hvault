@@ -1,0 +1,31 @@
+[hvault_syslog]
+log_group_name = hashivault_logs
+datetime_format = %b %d %H:%M:%S
+file = /var/log/messages
+buffer_duration = 5000
+log_stream_name = hashivault_{ip_address}_varlog_messages
+initial_position = start_of_file
+[hvault_hcorp_audit]
+log_group_name = hashivault_logs
+log_stream_name = hashivault_{ip_address}_vault_audit.log
+file = /var/log/hashivault/vault_audit.log
+[bash_history]
+log_group_name = all_shell_history
+log_stream_name = hvault_{ip_address}_ec2-user_bash_history
+file = /home/ec2-user/.bash_history
+[bash_history_root]
+log_group_name = all_shell_history
+log_stream_name = hvault_{ip_address}_root_bash_history
+file = /root/.bash_history
+[pkg_log]
+log_group_name = hashivault_logs
+log_stream_name = hvault_{ip_address}_yum_log
+file = /var/log/yum.log
+[ssh_log]
+log_group_name = all_ssh_logs
+log_stream_name = hvault_{ip_address}_ssh_log
+file = /var/log/secure
+[aide_log]
+log_group_name = all_aide_logs
+log_stream_name = hvault_{ip_address}_aide_log
+file = /var/log/aide/aide.log

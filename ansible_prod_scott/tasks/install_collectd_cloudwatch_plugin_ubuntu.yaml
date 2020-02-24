@@ -1,0 +1,74 @@
+- name: Install collectd-core package from default repos
+  apt:
+    name: collectd-core
+    state: present
+  become: True
+
+- name: Install collectd without recommended dependencies
+  apt:
+    name: collectd
+    state: present
+    install_recommends: no
+  become: True
+
+- name: Install python2.7-minimal (for Ubuntu 18.04+)
+  apt:
+    name: python2.7-minimal
+    state: present
+  become: True
+
+- name: Enable collectd systemd service
+  systemd:
+    name: collectd
+    enabled: yes
+  become: True
+
+- name: Check if collectd-cloudwatch install script has been downloaded
+  stat:
+    path: /root/setup.py
+  become: True
+  register: stat_result
+
+# Need to add new step which edits the script with sed to replace
+# 'python' with 'python2.7' on Ubuntu 18.04+
+
+- name: Download collectd-cloudwatch plugin install script from AWSLABS
+  get_url:
+    url: https://raw.githubusercontent.com/awslabs/collectd-cloudwatch/master/src/setup.py
+    dest: "/root"
+    force: yes
+  become: True
+  when: stat_result.stat.exists == False
+
+- name: Make downloaded python install script executable
+  file:
+    path: "/root/setup.py"
+    mode: "a+x"
+  become: True
+
+- name: check for string "python2.7" in first line of /root/setup.py
+  shell: grep python2.7 /root/setup.py
+  become: True
+  ignore_errors: True
+  register: python27yesno
+
+- debug:
+    var: python27yesno
+
+- name: Edit name of python2 executable in setup.py
+  shell: >
+    /bin/sed -i 's:/usr/bin/env python:/usr/bin/env python2.7:g' \
+    /root/setup.py
+  become: True
+  when: python27yesno.rc == 1
+
+- name: Check if collectd-cw plugin has been setup already
+  stat:
+    path: /opt/collectd-plugins/cloudwatch
+  become: True
+  register: stat_result
+
+- name: Run setup.py
+  command: /root/setup.py --non_interactive --enable_high_resolution_metrics --installation_method recommended
+  become: True
+  when: stat_result.stat.exists == False

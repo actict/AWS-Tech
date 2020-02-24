@@ -1,0 +1,12 @@
+# ansible-playbook aide_db_update_sudo.yaml -i hosts --extra-vars \
+#  "myhost=<specific host or group>"
+- name: update AIDE db on servers which allow su
+  hosts: '{{ myhost  }}'
+  tasks:
+    - name: update and rename AIDE DB (Ubuntu)
+      import_tasks: tasks/aide_db_update_rename_ubuntu_su.yaml
+      when: ansible_distribution == 'Ubuntu'
+
+    - name: update and rename AIDE DB (Amazon)
+      import_tasks: tasks/aide_db_update_rename_amznlinux2_su.yaml
+      when: ansible_distribution == 'Amazon'

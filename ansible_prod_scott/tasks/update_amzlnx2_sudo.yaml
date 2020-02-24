@@ -1,0 +1,12 @@
+- name: Recursively remove directory
+  shell: >
+      rm -rf /var/run/yum.pid
+  become: true
+
+- name: update pkg repo on amzlnx2 servers allowing sudo
+
+  yum:
+      name: "*"
+      state: latest
+      update_cache: yes
+  become: true

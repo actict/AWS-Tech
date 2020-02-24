@@ -1,0 +1,7 @@
+- name: playbook to stop PM2 process on AWS PROD wallet server
+  hosts: wallet
+  vars:
+    pm2_name: wallet_service
+  tasks:
+    - name: stop pm2 app
+      import_tasks: tasks/stop_pm2_service.yaml

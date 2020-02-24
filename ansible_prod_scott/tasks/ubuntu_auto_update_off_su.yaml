@@ -1,0 +1,25 @@
+# Note about 'lineinfile' module regexp - regexp defines the
+# pattern to look for in every line of the file. For state=present
+# (the default), the pattern to replace if found. Only the last
+# line found will be replaced. If the regexp is NOT matched, 'line'
+# will be added according to 'insertbefore' or 'insertafter' params.
+
+- name: Set ubuntu auto update off
+  lineinfile:
+    path: /etc/apt/apt.conf.d/20auto-upgrades
+    regexp: 'APT::Periodic::Update-Package-Lists "1";'
+    insertafter: EOF
+    line: APT::Periodic::Update-Package-Lists "0";
+  become: true
+  become_method: su
+  become_user: root
+
+- name: Set ubuntu auto update off
+  lineinfile:
+    path: /etc/apt/apt.conf.d/20auto-upgrades
+    regexp: 'APT::Periodic::Unattended-Upgrade "1";'
+    insertafter: EOF
+    line: APT::Periodic::Unattended-Upgrade "0";
+  become: true
+  become_method: su
+  become_user: root

@@ -1,0 +1,24 @@
+{
+  "agent": {
+    "metrics_collection_interval": 60,
+    "region": "ap-northeast-2",
+    "logfile": "",
+    "debug": false
+  },
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          {
+            "file_path": "/home/ubuntu/apps/scouter/logs/*.log",
+            "log_group_name": "scouter_logs",
+            "log_stream_name": "scouter_{ip_address}_logs",
+            "timezone": "UTC",
+            "encoding": "utf-8"
+          }
+        ]
+      }
+    },
+    "log_stream_name":"scouter_log_default"
+  }
+}

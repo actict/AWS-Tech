@@ -1,0 +1,7 @@
+- name: config cloudwatch for internal-api server
+  hosts: internal-api
+  vars:
+    my_hosts: internal-api
+  tasks:
+    - name: install cloudwatch-agent and configure
+      import_tasks: tasks/install_amzn_cloudwatch_agent_config_ubuntu_generic.yaml

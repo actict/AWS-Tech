@@ -1,0 +1,8 @@
+# ansible-playbook setup_AIDE_sudo.yaml -i hosts --extra-vars \
+#  "myhost=<specific host or group>"
+- name: Set Ubuntu auto update off
+  hosts: '{{ myhost  }}'
+  tasks:
+    - name: Change value 1 to 0
+      import_tasks: tasks/ubuntu_auto_update_off_sudo.yaml
+      when: ansible_distribution == 'Ubuntu'

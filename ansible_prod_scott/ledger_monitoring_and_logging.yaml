@@ -1,0 +1,11 @@
+- name: collectd, cloudwatch, and post-setup AIO for hashicorp vault
+  hosts: ledger
+  vars:
+    my_hosts: ledger
+  tasks:
+    - name: install collectd cloudwatch plugin on Amazon Linux 2
+      import_tasks: tasks/install_collectd_cloudwatch_plugin_amazon_linux2.yaml
+      #    - name: install awslogs (cloudwatch wrapper) and configure
+      #import_tasks: tasks/install_awslogs_amazon_linux2.yaml
+    - name: post-setup for collectd-cloudwatch
+      import_tasks: tasks/collectd_cw_post_setup_generic.yaml

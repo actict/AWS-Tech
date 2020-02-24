@@ -1,0 +1,4 @@
+- name: reboot system where sudo is enabled
+  reboot:
+    reboot_timeout: 120
+  become: true

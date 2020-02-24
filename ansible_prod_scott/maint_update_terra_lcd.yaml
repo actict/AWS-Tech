@@ -1,0 +1,8 @@
+- name: playbook to update pkgs and reboot AWS PROD terra-lcd server
+  hosts: terra-lcd
+  tasks:
+    - name: update packages on ubuntu server which allows sudo
+      import_tasks: tasks/update_ubuntu_su.yaml
+
+    - name: reboot server which allows sudo
+      import_tasks: tasks/reboot_server_su.yaml

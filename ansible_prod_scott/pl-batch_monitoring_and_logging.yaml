@@ -1,0 +1,11 @@
+- name: collectd, cloudwatch, and post-setup AIO for candy-crawler server
+  hosts: pl-batch
+  vars:
+    my_hosts: pl-batch
+  tasks:
+    - name: install collectd cloudwatch plugin
+      import_tasks: tasks/install_collectd_cloudwatch_plugin_ubuntu.yaml
+    - name: install cloudwatch-agent and configure
+      import_tasks: tasks/install_amzn_cloudwatch_agent_ubuntu_generic.yaml
+    - name: post-setup for collectd-cloudwatch
+      import_tasks: tasks/collectd_cw_post_setup_generic.yaml

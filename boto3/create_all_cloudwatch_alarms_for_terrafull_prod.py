@@ -1,0 +1,81 @@
+#!/usr/bin/env python3
+# create_all_cloudwatch_alarms_for_terrafull_prod.py
+#
+# Last Updated: 2019.05.28
+# Updated by: scott.hwang@actwo.com
+#
+# This script will create CPU, Memory, root disk, and process alarms
+# for the EC2 'terra-lcd' server running in AWS PROD Seoul region.
+
+
+import boto3
+import time
+from lib_cloudwatch_alarms import create_collectd_cpu_alarm
+from lib_cloudwatch_alarms import create_collectd_mem_alarm
+from lib_cloudwatch_alarms import create_collectd_root_disk_alarm
+from lib_cloudwatch_alarms import create_collectd_nonroot_disk_alarm
+from lib_cloudwatch_alarms import create_collectd_process_alarm
+from lib_cloudwatch_alarms import check_response_status
+from env_prod import sns_topic_dict, instance_id_dict
+
+
+def main():
+    start = time.time()
+    dictOfInst = {
+        # 'key' is instance alias 'key-value' is list containing the
+        # following fields: (1) sns topic name (2) instance id or
+        # hostname (3) collectd name of 2nd hard disk (4) list of
+        # collectd process names
+        'terrafull' : [sns_topic_dict['terrafull'],
+                    instance_id_dict['terrafull'], 'terrablocks',
+                    ['terrad', 'cloudwatch']
+        ],
+    }
+
+    session = boto3.Session(profile_name = 'prod_cw_full')
+    cwClient = session.client('cloudwatch')
+
+    for mykey in dictOfInst:
+        print("Creating CPU alarm for server %s" % mykey)
+        resp1 = create_collectd_cpu_alarm(cwClient, mykey,
+                                          dictOfInst[mykey][0],
+                                          dictOfInst[mykey][1])
+        check_response_status(resp1)
+
+        print("Creating memory alarm for server %s" % mykey)
+        resp2 = create_collectd_mem_alarm(cwClient, mykey,
+                                          dictOfInst[mykey][0],
+                                          dictOfInst[mykey][1])
+        check_response_status(resp2)
+
+        print("Creating root disk alarm for server %s" % mykey)
+        resp3 = create_collectd_root_disk_alarm(cwClient, mykey,
+                                                dictOfInst[mykey][0],
+                                                dictOfInst[mykey][1])
+        check_response_status(resp3)
+
+
+        print("Creating process alarms for server %s" % mykey)
+        for proc in dictOfInst[mykey][3]:
+            print("Create alarm for process %s" % proc)
+            resp4 = create_collectd_process_alarm(cwClient,
+                                                  mykey,
+                                                  dictOfInst[mykey][0],
+                                                  dictOfInst[mykey][1],
+                                                  proc)
+        check_response_status(resp4)
+        resp5 = create_collectd_nonroot_disk_alarm(cwClient,
+                                                   mykey,
+                                                   dictOfInst[mykey][0],
+                                                   dictOfInst[mykey][1],
+                                                   dictOfInst[mykey][2],
+                                                   dictOfInst[mykey][2]
+                                                   )
+        check_response_status(resp5)
+
+    end = time.time()
+    print("This script ran in %s seconds." %(end - start))
+
+
+if __name__ == "__main__":
+    main()

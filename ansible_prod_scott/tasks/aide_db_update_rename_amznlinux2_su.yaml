@@ -1,0 +1,37 @@
+# ansible task file for updating AIDE db on Amazon Linux 2 This task
+# file only works on servers allowing sudo!
+- name: Check if AIDE is installed or not (Amazon Linux 2)
+  stat:
+    path: /sbin/aide
+  become: true
+  become_method: su
+  become_user: root
+  register: aide_rhel
+
+- name: Update AIDE DB (Amazon Linux 2)
+  shell: >
+    /sbin/aide -c /etc/aide.conf --update
+  become: true
+  become_method: su
+  become_user: root
+  when: aide_rhel.stat.exists == true
+  ignore_errors: true
+
+- name: rename updated AIDE db
+  copy:
+    remote_src: true
+    src: /var/lib/aide/aide.db.new.gz
+    dest: /var/lib/aide/aide.db.gz
+  become: true
+  become_method: su
+  become_user: root
+  when: aide_rhel.stat.exists == true
+
+- name: delete aide.db.gz.new
+  file:
+    path: /var/lib/aide/aide.db.new.gz
+    state: absent
+  become: true
+  become_method: su
+  become_user: root
+  when: aide_rhel.stat.exists == true

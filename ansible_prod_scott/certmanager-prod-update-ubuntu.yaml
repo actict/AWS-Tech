@@ -1,0 +1,19 @@
+---
+- name: Packages update certmanager server playbook
+  become: True
+  hosts: certmanager
+  tasks:
+      - name: Do an update in Ubuntu
+        apt:
+            update_cache: yes
+
+      - name: Do an upgrade in Ubuntu
+        apt:
+            upgrade: dist
+            dpkg_options: 'force-confold,force-confdef'
+        environment:
+            DEBIAN_FRONTEND: noninteractive
+
+      - name: Reboot system
+        reboot:
+            reboot_timeout: 120

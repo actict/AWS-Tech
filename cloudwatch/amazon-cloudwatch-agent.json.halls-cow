@@ -1,0 +1,59 @@
+{
+  "agent": {
+    "metrics_collection_interval": 60,
+    "region": "ap-northeast-2",
+    "logfile": "",
+    "debug": false
+  },
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          {
+            "file_path": "/var/log/syslog",
+            "log_group_name": "halls_cow_logs",
+            "log_stream_name": "halls_cow_{ip_address}_syslog",
+            "timezone": "UTC",
+            "encoding": "utf-8"
+          },
+          {
+            "file_path": "/home/ubuntu/apps/candy-store-cow/logs/application.log",
+            "log_group_name": "halls_cow_logs",
+            "log_stream_name": "halls_cow_{ip_address}_application.log",
+            "timezone": "UTC",
+            "encoding": "utf-8"
+          },
+          {
+            "file_path": "/home/ubuntu/apps/candy-store-cow/logs/debug.log",
+            "log_group_name": "halls_cow_logs",
+            "log_stream_name": "halls_cow_{ip_address}_debug.log",
+            "timezone": "UTC",
+            "encoding": "utf-8"
+          },
+          {
+            "file_path": "/home/ubuntu/apps/candy-store-cow/logs/error.log",
+            "log_group_name": "halls_cow_logs",
+            "log_stream_name": "halls_cow_{ip_address}_error.log",
+            "timezone": "UTC",
+            "encoding": "utf-8"
+          },
+          {
+            "file_path": "/home/ubuntu/apps/candy-store-cow/logs/info.log",
+            "log_group_name": "halls_cow_logs",
+            "log_stream_name": "halls_cow_{ip_address}_info.log",
+            "timezone": "UTC",
+            "encoding": "utf-8"
+          },
+          {
+            "file_path": "/home/ubuntu/apps/candy-store-cow/logs/http.log",
+            "log_group_name": "halls_cow_logs",
+            "log_stream_name": "halls_cow_{ip_address}_http.log",
+            "timezone": "UTC",
+            "encoding": "utf-8"
+          }
+        ]
+      }
+    },
+    "log_stream_name":"halls_cow_log_default"
+  }
+}

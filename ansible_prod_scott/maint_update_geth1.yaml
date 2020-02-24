@@ -1,0 +1,8 @@
+- name: playbook to update packages and reboot AWS PROD geth1 server
+  hosts: geth1
+  tasks:
+    - name: update packages on ubuntu server which doesn't allow sudo
+      import_tasks: tasks/update_ubuntu_su.yaml
+
+    - name: reboot server which doesn't allow sudo
+      import_tasks: tasks/reboot_server_su.yaml

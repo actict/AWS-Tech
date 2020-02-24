@@ -1,0 +1,11 @@
+- name: Setup a Terra (cosmos-sdk, tendermint) full-node
+  hosts: terra-dev
+  vars:
+    my_hosts: terra-dev
+    gopkg: go1.12.3.linux-amd64.tar.gz
+  tasks:
+#    - name: install Golang and setup GOLANG envo variables
+#      import_tasks: tasks/setup_golang_debian.yaml
+    - name: install terra-project/core (terrad, terracli)
+      import_tasks: tasks/setup_terra-project_core.yaml
+

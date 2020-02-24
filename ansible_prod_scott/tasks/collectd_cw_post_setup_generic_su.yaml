@@ -1,0 +1,33 @@
+- name: Check if collectd-cw post-setup script exists on remote
+  stat:
+    path: /root/collectd_cw_post_setup_{{ my_hosts }}.sh
+  become: True
+  become_method: su
+  become_user: root
+  register: stat_result
+
+- name: cp collectd_cw_post_setup{{ my_hosts }} script to remote
+  copy:
+    src: ~/Documents/SecOps-Documents/AWS/collectd/collectd_cw_post_setup_{{ my_hosts }}.sh
+    dest: /root/collectd_cw_post_setup_{{ my_hosts }}.sh
+    mode: 0755
+  become: True
+  become_method: su
+  become_user: root
+  when: stat_result.stat.exists == False
+
+- name: run post setup script remotely
+  shell: >
+    /bin/bash /root/collectd_cw_post_setup_{{ my_hosts }}.sh
+  become: True
+  become_method: su
+  become_user: root
+  when: stat_result.stat.exists == False
+
+- name: restart collectd process to apply config changes
+  service:
+    name: collectd
+    state: restarted
+  become: True
+  become_method: su
+  become_user: root

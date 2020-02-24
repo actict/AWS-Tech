@@ -1,0 +1,12 @@
+- name: update pkg repo on ubuntu servers allowing sudo
+  apt:
+    update_cache: yes
+  become: true
+
+- name: upgrade packages on ubuntu servers allowing sudo
+  apt:
+    upgrade: dist
+    dpkg_options: 'force-confold,force-confdef'
+  environment:
+    DEBIAN_FRONTEND: noninteractive
+  become: true
